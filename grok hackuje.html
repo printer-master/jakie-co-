@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Key Copier – HTML Edition</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #111;
+      color: #0f0;
+      margin: 0;
+      padding: 20px;
+      text-align: center;
+    }
+    h1 { color: #0f8; margin-bottom: 10px; }
+    select, button {
+      padding: 10px 16px;
+      font-size: 1.1em;
+      margin: 8px;
+      background: #222;
+      color: #0f8;
+      border: 1px solid #0f8;
+      cursor: pointer;
+    }
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+    }
+    canvas {
+      background: #000;
+      border: 2px solid #0f8;
+      margin: 20px auto;
+      display: block;
+    }
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 20px;
+    }
+    .slider-box {
+      background: #1a1a1a;
+      padding: 15px;
+      border-radius: 8px;
+      min-width: 180px;
+    }
+    input[type="range"] {
+      width: 140px;
+      accent-color: #0f8;
+    }
+    #bittingCode {
+      font-size: 2.2em;
+      color: #ff0;
+      margin: 20px 0;
+      word-break: break-all;
+    }
+    footer { margin-top: 40px; font-size: 0.9em; color: #555; }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <h1>Key Copier – HTML / JS</h1>
+  <p>Wybierz typ klucza i dopasuj głębokości nacięć (jak na filmiku z Flipperem)</p>
+
+  <select id="keyType">
+    <option value="KW1">Kwikset KW1 / KW10 (najpopularniejszy w USA)</option>
+    <option value="SC1">Schlage SC1 / SC4</option>
+  </select>
+
+  <div class="controls">
+    <div class="slider-box">
+      <label>Pozycja 1: <span id="val1">3</span></label><br>
+      <input type="range" id="cut1" min="0" max="9" value="3" step="1">
+    </div>
+    <div class="slider-box">
+      <label>Pozycja 2: <span id="val2">3</span></label><br>
+      <input type="range" id="cut2" min="0" max="9" value="3" step="1">
+    </div>
+    <div class="slider-box">
+      <label>Pozycja 3: <span id="val3">3</span></label><br>
+      <input type="range" id="cut3" min="0" max="9" value="3" step="1">
+    </div>
+    <div class="slider-box">
+      <label>Pozycja 4: <span id="val4">3</span></label><br>
+      <input type="range" id="cut4" min="0" max="9" value="3" step="1">
+    </div>
+    <div class="slider-box">
+      <label>Pozycja 5: <span id="val5">3</span></label><br>
+      <input type="range" id="cut5" min="0" max="9" value="3" step="1">
+    </div>
+  </div>
+
+  <h2>Kod bitting:</h2>
+  <div id="bittingCode">33333</div>
+
+  <canvas id="keyCanvas" width="700" height="220"></canvas>
+
+  <button onclick="copyToClipboard()">Kopiuj kod bitting</button>
+</div>
+
+<footer>
+  Made for fun – nie zastąpi Flippera z Momentum + Key Copier by zinongli / Torron<br>
+  KW1 głębokości ≈ 0–7 (realnie najczęściej 1–6), SC1 podobnie
+</footer>
+
+<script>
+  const canvas = document.getElementById('keyCanvas');
+  const ctx = canvas.getContext('2d');
+  const bittingDiv = document.getElementById('bittingCode');
+
+  const sliders = [
+    document.getElementById('cut1'), document.getElementById('cut2'),
+    document.getElementById('cut3'), document.getElementById('cut4'),
+    document.getElementById('cut5')
+  ];
+
+  const vals = [
+    document.getElementById('val1'), document.getElementById('val2'),
+    document.getElementById('val3'), document.getElementById('val4'),
+    document.getElementById('val5')
+  ];
+
+  let currentType = 'KW1';
+
+  // Przybliżone głębokości w pikselach (od góry blanka w dół)
+  // KW1: 0 = najgłębiej (~ najniższy cut), 7 = prawie płasko
+  const depthScale = {
+    KW1: [0, 18, 36, 54, 72, 90, 108, 126, 144, 162], // piksele w dół
+    SC1: [0, 16, 32, 48, 64, 80, 96, 112, 128, 144]   // trochę inne proporcje w realu
+  };
+
+  function drawKey() {
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    const cuts = sliders.map(s => parseInt(s.value));
+    const depths = depthScale[currentType];
+
+    // Grzbiet klucza (góra)
+    ctx.strokeStyle = '#0f8';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(50, 40);
+    ctx.lineTo(650, 40);
+    ctx.stroke();
+
+    // Głowa klucza (lewa strona – uproszczenie)
+    ctx.beginPath();
+    ctx.moveTo(50, 40);
+    ctx.lineTo(30, 80);
+    ctx.lineTo(30, 180);
+    ctx.lineTo(50, 220);
+    ctx.stroke();
+
+    // Nacięcia
+    let x = 120;
+    const spacing = 100; // odstęp między pinami
+
+    ctx.fillStyle = '#0f03';
+    ctx.strokeStyle = '#0f8';
+    ctx.lineWidth = 3;
+
+    for (let i = 0; i < 5; i++) {
+      const depthPx = depths[cuts[i]] || 90;
+      // prostokąt nacięcia
+      ctx.fillRect(x - 18, 40, 36, depthPx);
+      // linie konturu
+      ctx.beginPath();
+      ctx.moveTo(x - 18, 40);
+      ctx.lineTo(x - 18, 40 + depthPx);
+      ctx.lineTo(x + 18, 40 + depthPx);
+      ctx.lineTo(x + 18, 40);
+      ctx.stroke();
+
+      // numer głębokości
+      ctx.fillStyle = '#ff0';
+      ctx.font = 'bold 18px Arial';
+      ctx.fillText(cuts[i], x - 6, 35);
+
+      x += spacing;
+    }
+
+    // Dolna krawędź (płaska)
+    ctx.beginPath();
+    ctx.moveTo(50, 220);
+    ctx.lineTo(650, 220);
+    ctx.stroke();
+
+    // Aktualizacja kodu
+    bittingDiv.textContent = cuts.join('');
+  }
+
+  function updateFromSliders() {
+    sliders.forEach((s, i) => {
+      vals[i].textContent = s.value;
+    });
+    drawKey();
+  }
+
+  // Zmiana typu klucza
+  document.getElementById('keyType').addEventListener('change', e => {
+    currentType = e.target.value;
+    drawKey();
+  });
+
+  // Wszystkie suwaki
+  sliders.forEach(s => s.addEventListener('input', updateFromSliders));
+
+  function copyToClipboard() {
+    const code = bittingDiv.textContent;
+    navigator.clipboard.writeText(code).then(() => {
+      alert('Kod skopiowany: ' + code + '\nWrzuć do OpenSCAD albo generatora kluczy 3D');
+    });
+  }
+
+  // start
+  updateFromSliders();
+</script>
+</body>
+</html>
